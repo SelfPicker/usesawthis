@@ -42,10 +42,8 @@
   <p id="empty" class="empty" hidden>찾는 상품이 없어요</p>
 </main>
 <script>
-// 상품 목록 — 영상을 올릴 때마다 맨 위에 한 줄씩 추가된다.
-const PRODUCTS = [
-  { no: 1, name: "만능 라쳇렌치 드라이버 세트", price: 5900, url: "https://toss.shopping/_m/7Cmlh4tw", img: "img/0001.jpg" },
-];
+// 상품 목록은 products.json(새 상품이 맨 위) — 영상을 올릴 때 앱이 한 줄씩 추가한다.
+let PRODUCTS = [];
 
 const list = document.getElementById("list");
 const empty = document.getElementById("empty");
@@ -79,7 +77,10 @@ function render(term) {
 q.addEventListener("input", () => render(q.value));
 const start = new URLSearchParams(location.search).get("n") || "";
 q.value = start;
-render(start);
+fetch("products.json", { cache: "no-store" })
+  .then((r) => r.json())
+  .then((d) => { PRODUCTS = Array.isArray(d.products) ? d.products : []; render(q.value); })
+  .catch(() => { empty.textContent = "목록을 불러오지 못했어요. 잠시 뒤 새로고침해 주세요."; empty.hidden = false; });
 </script>
 </body>
 </html>
