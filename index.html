@@ -22,6 +22,7 @@
   ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
   li a { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
   li a:active { transform: scale(.99); }
+  .thumb { flex: none; width: 72px; height: 72px; border-radius: 10px; object-fit: cover; background: #fff; border: 1px solid var(--line); }
   .no { flex: none; font-weight: 800; color: #fff; background: var(--mint); border-radius: 10px; padding: 6px 10px; font-variant-numeric: tabular-nums; }
   .name { flex: 1; font-weight: 700; }
   .price { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
@@ -43,7 +44,7 @@
 <script>
 // 상품 목록 — 영상을 올릴 때마다 맨 위에 한 줄씩 추가된다.
 const PRODUCTS = [
-  { no: 1, name: "만능 라쳇렌치 드라이버 세트", price: 5900, url: "https://toss.shopping/_m/7Cmlh4tw" },
+  { no: 1, name: "만능 라쳇렌치 드라이버 세트", price: 5900, url: "https://toss.shopping/_m/7Cmlh4tw", img: "img/0001.jpg" },
 ];
 
 const list = document.getElementById("list");
@@ -60,12 +61,16 @@ function render(term) {
     const a = document.createElement("a");
     a.href = p.url;
     a.rel = "nofollow sponsored noopener";
+    const img = document.createElement("img"); img.className = "thumb"; img.src = p.img || ""; img.alt = p.name; img.loading = "lazy";
+    img.width = 72; img.height = 72;
     const no = document.createElement("span"); no.className = "no"; no.textContent = pad(p.no);
     const name = document.createElement("span"); name.className = "name"; name.textContent = p.name;
     const price = document.createElement("span"); price.className = "price"; price.textContent = `${p.price.toLocaleString("ko-KR")}원`;
     const go = document.createElement("span"); go.className = "go"; go.textContent = "보러 가기 ›";
+    const no2 = document.createElement("span"); no2.className = "price"; no2.textContent = `상품 번호 ${pad(p.no)}`;
+    name.prepend(no2);
     name.append(price);
-    a.append(no, name, go);
+    a.append(img, name, go);
     li.append(a);
     return li;
   }));
