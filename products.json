@@ -1,3 +1,18 @@
-{"products": [
- {"no": 1, "name": "만능 라쳇렌치 드라이버 세트", "price": 5900, "url": "https://toss.shopping/_m/7Cmlh4tw", "img": "img/0001.jpg"}
-]}
+{
+ "products": [
+  {
+   "no": 2,
+   "name": "눈썹 제모기",
+   "price": 5600,
+   "url": "https://toss.shopping/_m/xTJAVsDa",
+   "img": "img/0002.jpg"
+  },
+  {
+   "no": 1,
+   "name": "만능 라쳇렌치 드라이버 세트",
+   "price": 5900,
+   "url": "https://toss.shopping/_m/7Cmlh4tw",
+   "img": "img/0001.jpg"
+  }
+ ]
+}
