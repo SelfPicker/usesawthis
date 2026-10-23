@@ -28,6 +28,12 @@
   .price { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
   .go { flex: none; color: var(--mint); font-weight: 800; }
   .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+  .pager { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 8px; }
+  .pager[hidden] { display: none; }
+  .pager button { min-width: 40px; height: 40px; padding: 0 10px; font-size: 16px; font-weight: 700; color: var(--ink);
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px; font-variant-numeric: tabular-nums; }
+  .pager button[aria-current="page"] { color: #fff; background: var(--mint); border-color: var(--mint); }
+  .pager button:disabled { opacity: .35; }
 </style>
 </head>
 <body>
@@ -37,49 +43,82 @@
     <p>영상에 나온 상품 번호를 검색하세요</p>
   </header>
   <div class="ad">이 페이지의 링크는 토스쇼핑 쉐어링크 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</div>
-  <div class="search"><input id="q" type="search" inputmode="search" placeholder="상품 번호(예: 1) 또는 이름" autocomplete="off"></div>
+  <div class="search">
+    <input id="q" type="search" inputmode="search" placeholder="상품 번호(예: 1) 또는 이름" autocomplete="off">
+    <nav id="pager" class="pager" aria-label="페이지" hidden></nav>
+  </div>
   <ul id="list"></ul>
   <p id="empty" class="empty" hidden>찾는 상품이 없어요</p>
 </main>
-<script>
+<script type="module">
 // 상품 목록은 products.json(새 상품이 맨 위) — 영상을 올릴 때 앱이 한 줄씩 추가한다.
+// open_at(UTC)이 있으면 그 시각부터 보인다(영상 예약 공개와 같게). 한 화면에 들어가는 만큼씩 쪽을 나눈다.
+import { visibleProducts, matches, pageSize, pageOf, pageButtons } from "./list.js";
+
+const ITEM_PX = 112;          // 상품 한 칸 높이(사진 72 + 안쪽 여백 28 + 테두리 + 간격 10)
+const PAGER_PX = 48;          // 쪽 버튼 줄(40 + 위 여백 8) — 숨어 있어도 빼고 센다(쪽마다 개수가 달라지지 않게)
 let PRODUCTS = [];
+let page = 1;
 
 const list = document.getElementById("list");
 const empty = document.getElementById("empty");
+const pager = document.getElementById("pager");
 const q = document.getElementById("q");
 const pad = (n) => String(n).padStart(4, "0");
 
-function render(term) {
-  const t = term.trim().toLowerCase().replace(/\s/g, "");
-  const num = /^\d+$/.test(t) ? Number(t) : null;
-  const hits = PRODUCTS.filter((p) => !t || (num !== null ? p.no === num : p.name.toLowerCase().replace(/\s/g, "").includes(t)));
-  list.replaceChildren(...hits.map((p) => {
-    const li = document.createElement("li");
-    const a = document.createElement("a");
-    a.href = p.url;
-    a.rel = "nofollow sponsored noopener";
-    const img = document.createElement("img"); img.className = "thumb"; img.src = p.img || ""; img.alt = p.name; img.loading = "lazy";
-    img.width = 72; img.height = 72;
-    const no = document.createElement("span"); no.className = "no"; no.textContent = pad(p.no);
-    const name = document.createElement("span"); name.className = "name"; name.textContent = p.name;
-    const price = document.createElement("span"); price.className = "price"; price.textContent = `${p.price.toLocaleString("ko-KR")}원`;
-    const go = document.createElement("span"); go.className = "go"; go.textContent = "보러 가기 ›";
-    const no2 = document.createElement("span"); no2.className = "price"; no2.textContent = `상품 번호 ${pad(p.no)}`;
-    name.prepend(no2);
-    name.append(price);
-    a.append(img, name, go);
-    li.append(a);
-    return li;
-  }));
+function item(p) {
+  const li = document.createElement("li");
+  const a = document.createElement("a");
+  a.href = p.url;
+  a.rel = "nofollow sponsored noopener";
+  const img = document.createElement("img"); img.className = "thumb"; img.src = p.img || ""; img.alt = p.name; img.loading = "lazy";
+  img.width = 72; img.height = 72;
+  const name = document.createElement("span"); name.className = "name"; name.textContent = p.name;
+  const price = document.createElement("span"); price.className = "price"; price.textContent = `${p.price.toLocaleString("ko-KR")}원`;
+  const go = document.createElement("span"); go.className = "go"; go.textContent = "보러 가기 ›";
+  const no2 = document.createElement("span"); no2.className = "price"; no2.textContent = `상품 번호 ${pad(p.no)}`;
+  name.prepend(no2);
+  name.append(price);
+  a.append(img, name, go);
+  li.append(a);
+  return li;
+}
+
+function button(text, to, label, current) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = text;
+  b.setAttribute("aria-label", label);
+  if (current) b.setAttribute("aria-current", "page");
+  b.disabled = to === null;
+  b.addEventListener("click", () => { page = to; render(); });
+  return b;
+}
+
+function drawPager(cur, pages) {
+  pager.hidden = pages <= 1;
+  if (pages <= 1) { pager.replaceChildren(); return; }
+  pager.replaceChildren(button("‹", cur > 1 ? cur - 1 : null, "이전 쪽"),
+    ...pageButtons(cur, pages).map((n) => button(String(n), n, `${n}쪽`, n === cur)),
+    button("›", cur < pages ? cur + 1 : null, "다음 쪽"));
+}
+
+function render() {
+  const hits = visibleProducts(PRODUCTS, Date.now()).filter((p) => matches(p, q.value));
+  const top = list.getBoundingClientRect().top + window.scrollY + (pager.hidden ? PAGER_PX : 0);
+  const per = pageSize(window.innerHeight, top, ITEM_PX);
+  const shown = pageOf(hits, page, per);
+  page = shown.page;
+  list.replaceChildren(...shown.items.map(item));
+  drawPager(shown.page, shown.pages);
   empty.hidden = hits.length > 0;
 }
-q.addEventListener("input", () => render(q.value));
-const start = new URLSearchParams(location.search).get("n") || "";
-q.value = start;
+q.addEventListener("input", () => { page = 1; render(); });
+window.addEventListener("resize", () => render());
+q.value = new URLSearchParams(location.search).get("n") || "";
 fetch("products.json", { cache: "no-store" })
   .then((r) => r.json())
-  .then((d) => { PRODUCTS = Array.isArray(d.products) ? d.products : []; render(q.value); })
+  .then((d) => { PRODUCTS = Array.isArray(d.products) ? d.products : []; render(); })
   .catch(() => { empty.textContent = "목록을 불러오지 못했어요. 잠시 뒤 새로고침해 주세요."; empty.hidden = false; });
 </script>
 </body>
