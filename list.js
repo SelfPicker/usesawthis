@@ -39,3 +39,22 @@ export function pageButtons(page, pages) {
   const start = Math.min(Math.max(1, page - Math.floor(BUTTONS / 2)), pages - n + 1);
   return Array.from({ length: n }, (_, i) => start + i);
 }
+
+// ── 클릭 수(2026-10-23) — 구글 시트(Apps Script 웹 앱, tools/linkpage_counter/Code.gs)에 세고 목록에 보인다 ──
+const RECOUNT_MS = 30 * 60000;      // 같은 브라우저가 30분 안에 같은 상품을 다시 누르면 한 번으로
+
+export function clickLabel(n) {
+  const v = Number(n);
+  return Number.isFinite(v) && v > 0 ? `클릭 ${v.toLocaleString("ko-KR")}` : "";
+}
+
+export function shouldCount(lastMs, nowMs) {
+  const last = Number(lastMs);
+  return !Number.isFinite(last) || nowMs - last > RECOUNT_MS;
+}
+
+// act: hit(하나 올리기, no 필요) · all(상품별 수 전부). 주소가 비면 ""(기능 꺼짐)
+export function counterUrl(base, act, no) {
+  if (!base) return "";
+  return `${base}?act=${act}${no !== undefined ? `&no=${encodeURIComponent(no)}` : ""}`;
+}

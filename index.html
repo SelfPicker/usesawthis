@@ -27,6 +27,7 @@
   .name { flex: 1; font-weight: 700; }
   .price { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
   .go { flex: none; color: var(--mint); font-weight: 800; }
+  .clicks { display: block; font-size: 13px; font-weight: 700; color: var(--mint); }
   .empty { text-align: center; color: var(--muted); padding: 24px 0; }
   .pager { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 8px; }
   .pager[hidden] { display: none; }
@@ -53,11 +54,13 @@
 <script type="module">
 // 상품 목록은 products.json(새 상품이 맨 위) — 영상을 올릴 때 앱이 한 줄씩 추가한다.
 // open_at(UTC)이 있으면 그 시각부터 보인다(영상 예약 공개와 같게). 한 화면에 들어가는 만큼씩 쪽을 나눈다.
-import { visibleProducts, matches, pageSize, pageOf, pageButtons } from "./list.js";
+import { visibleProducts, matches, pageSize, pageOf, pageButtons, clickLabel, shouldCount, counterUrl } from "./list.js";
+import { COUNTER_URL } from "./counter.js";
 
 const ITEM_PX = 112;          // 상품 한 칸 높이(사진 72 + 안쪽 여백 28 + 테두리 + 간격 10)
 const PAGER_PX = 48;          // 쪽 버튼 줄(40 + 위 여백 8) — 숨어 있어도 빼고 센다(쪽마다 개수가 달라지지 않게)
 let PRODUCTS = [];
+let COUNTS = {};              // 상품 번호 → 클릭 수(구글 시트) — 못 읽으면 비어 있고 목록은 그대로
 let page = 1;
 
 const list = document.getElementById("list");
@@ -79,6 +82,9 @@ function item(p) {
   const no2 = document.createElement("span"); no2.className = "price"; no2.textContent = `상품 번호 ${pad(p.no)}`;
   name.prepend(no2);
   name.append(price);
+  const clicks = clickLabel(COUNTS[String(p.no)]);
+  if (clicks) { const c = document.createElement("span"); c.className = "clicks"; c.textContent = clicks; name.append(c); }
+  a.addEventListener("click", () => countClick(p.no));
   a.append(img, name, go);
   li.append(a);
   return li;
@@ -106,19 +112,37 @@ function drawPager(cur, pages) {
 function render() {
   const hits = visibleProducts(PRODUCTS, Date.now()).filter((p) => matches(p, q.value));
   const top = list.getBoundingClientRect().top + window.scrollY + (pager.hidden ? PAGER_PX : 0);
-  const per = pageSize(window.innerHeight, top, ITEM_PX);
+  const first = list.firstElementChild;      // 그려진 칸이 있으면 실제 높이(클릭 수 줄이 붙으면 커진다)
+  const itemH = first ? first.getBoundingClientRect().height + 10 : ITEM_PX;
+  const per = pageSize(window.innerHeight, top, itemH);
   const shown = pageOf(hits, page, per);
   page = shown.page;
   list.replaceChildren(...shown.items.map(item));
   drawPager(shown.page, shown.pages);
   empty.hidden = hits.length > 0;
 }
+// 누르면 시트에 +1(같은 브라우저 30분에 한 번) — 기다리지 않고 바로 상품으로 넘어간다(keepalive)
+function countClick(no) {
+  const url = counterUrl(COUNTER_URL, "hit", no);
+  if (!url) return;
+  const key = `usesawthis_click_${no}`;
+  let last;
+  try { last = localStorage.getItem(key); } catch (e) { last = null; }
+  if (!shouldCount(last === null ? undefined : last, Date.now())) return;
+  try { localStorage.setItem(key, String(Date.now())); } catch (e) { /* 저장 불가 */ }
+  fetch(url, { mode: "no-cors", keepalive: true }).catch(() => {});
+}
+function loadCounts() {
+  const url = counterUrl(COUNTER_URL, "all");
+  if (!url) return;
+  fetch(url).then((r) => r.json()).then((d) => { COUNTS = (d && d.counts) || {}; render(); }).catch(() => {});
+}
 q.addEventListener("input", () => { page = 1; render(); });
 window.addEventListener("resize", () => render());
 q.value = new URLSearchParams(location.search).get("n") || "";
 fetch("products.json", { cache: "no-store" })
   .then((r) => r.json())
-  .then((d) => { PRODUCTS = Array.isArray(d.products) ? d.products : []; render(); })
+  .then((d) => { PRODUCTS = Array.isArray(d.products) ? d.products : []; render(); loadCounts(); })
   .catch(() => { empty.textContent = "목록을 불러오지 못했어요. 잠시 뒤 새로고침해 주세요."; empty.hidden = false; });
 </script>
 </body>
