@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쿠팡에서 찾은 생활템 모음</title>
+<meta name="description" content="쿠팡에서 찾은 생활용품 모음 — 번호나 이름으로 찾아보세요">
+<style>
+  :root { --mint: #19c3a6; --ink: #0e3b34; --bg: #f4faf9; --card: #fff; --muted: #5b6b68; --line: #dbe7e4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1716; --card: #17211f; --ink: #e3f1ee; --muted: #93a6a2; --line: #26332f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { text-align: center; margin-bottom: 16px; }
+  .logo { display: inline-block; background: var(--mint); color: #fff; font-weight: 800; font-size: 18px; padding: 6px 16px; border-radius: 18px; }
+  header p { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+  .ad { font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-bottom: 14px; }
+  .search { position: sticky; top: 0; padding: 8px 0; background: var(--bg); }
+  .search input { width: 100%; font-size: 18px; padding: 12px 14px; border: 2px solid var(--mint); border-radius: 12px; background: var(--card); color: var(--ink); outline: none; }
+  ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  li a { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  li a:active { transform: scale(.99); }
+  .thumb { flex: none; width: 72px; height: 72px; border-radius: 10px; object-fit: cover; background: #fff; border: 1px solid var(--line); }
+  .no { flex: none; font-weight: 800; color: #fff; background: var(--mint); border-radius: 10px; padding: 6px 10px; font-variant-numeric: tabular-nums; }
+  .name { flex: 1; font-weight: 700; }
+  .price { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
+  .go { flex: none; color: var(--mint); font-weight: 800; }
+  .clicks { display: block; font-size: 13px; font-weight: 700; color: var(--mint); }
+  .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+  .pager { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 8px; }
+  .pager[hidden] { display: none; }
+  .pager button { min-width: 40px; height: 40px; padding: 0 10px; font-size: 16px; font-weight: 700; color: var(--ink);
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px; font-variant-numeric: tabular-nums; }
+  .pager button[aria-current="page"] { color: #fff; background: var(--mint); border-color: var(--mint); }
+  .pager button:disabled { opacity: .35; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="logo">쿠팡에서 찾은 생활템 모음</span>
+    <p>글에 나온 상품 번호를 검색하세요</p>
+  </header>
+  <div class="ad">이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</div>
+  <div class="search">
+    <input id="q" type="search" inputmode="search" placeholder="상품 번호(예: 1) 또는 이름" autocomplete="off">
+    <nav id="pager" class="pager" aria-label="페이지" hidden></nav>
+  </div>
+  <ul id="list"></ul>
+  <p id="empty" class="empty" hidden>찾는 상품이 없어요</p>
+</main>
+<script type="module">
+// 상품 목록은 products.json(새 상품이 맨 위) — 글을 예약할 때 앱이 한 줄씩 추가한다.
+// open_at(UTC)이 있으면 그 시각부터 보인다(글 예약 시각과 같게). 한 화면에 들어가는 만큼씩 쪽을 나눈다.
+import { visibleProducts, matches, pageSize, pageOf, pageButtons, clickLabel, shouldCount, counterUrl } from "./list.js";
+import { COUNTER_URL } from "./counter.js";
+
+const ITEM_PX = 112;          // 상품 한 칸 높이(사진 72 + 안쪽 여백 28 + 테두리 + 간격 10)
+const PAGER_PX = 48;          // 쪽 버튼 줄(40 + 위 여백 8) — 숨어 있어도 빼고 센다(쪽마다 개수가 달라지지 않게)
+let PRODUCTS = [];
+let COUNTS = {};              // 상품 번호 → 클릭 수(구글 시트) — 못 읽으면 비어 있고 목록은 그대로
+let page = 1;
+
+const list = document.getElementById("list");
+const empty = document.getElementById("empty");
+const pager = document.getElementById("pager");
+const q = document.getElementById("q");
+const pad = (n) => String(n).padStart(4, "0");
+
+// 주소는 https?:// 만(그 밖의 javascript: 등은 막는다), 사진은 우리 img/ 경로도 허용
+const safeHttp = (u) => (/^https?:\/\//i.test(String(u || "")) ? String(u) : "#");
+const safeImg = (u) => (/^(https?:\/\/|img\/)/i.test(String(u || "")) ? String(u) : "");
+
+function item(p) {
+  const li = document.createElement("li");
+  const a = document.createElement("a");
+  a.href = safeHttp(p.url);
+  a.rel = "nofollow sponsored noopener";
+  const img = document.createElement("img"); img.className = "thumb"; img.src = safeImg(p.img); img.alt = p.name; img.loading = "lazy";
+  img.width = 72; img.height = 72;
+  const name = document.createElement("span"); name.className = "name"; name.textContent = p.name;
+  const price = document.createElement("span"); price.className = "price"; price.textContent = `${p.price.toLocaleString("ko-KR")}원`;
+  const go = document.createElement("span"); go.className = "go"; go.textContent = "보러 가기 ›";
+  const no2 = document.createElement("span"); no2.className = "price"; no2.textContent = `상품 번호 ${pad(p.no)}`;
+  name.prepend(no2);
+  name.append(price);
+  const clicks = clickLabel(COUNTS[String(p.no)]);
+  if (clicks) { const c = document.createElement("span"); c.className = "clicks"; c.textContent = clicks; name.append(c); }
+  a.addEventListener("click", () => countClick(p.no));
+  a.append(img, name, go);
+  li.append(a);
+  return li;
+}
+
+function button(text, to, label, current) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = text;
+  b.setAttribute("aria-label", label);
+  if (current) b.setAttribute("aria-current", "page");
+  b.disabled = to === null;
+  b.addEventListener("click", () => { page = to; render(); });
+  return b;
+}
+
+function drawPager(cur, pages) {
+  pager.hidden = pages <= 1;
+  if (pages <= 1) { pager.replaceChildren(); return; }
+  pager.replaceChildren(button("‹", cur > 1 ? cur - 1 : null, "이전 쪽"),
+    ...pageButtons(cur, pages).map((n) => button(String(n), n, `${n}쪽`, n === cur)),
+    button("›", cur < pages ? cur + 1 : null, "다음 쪽"));
+}
+
+function render() {
+  const hits = visibleProducts(PRODUCTS, Date.now()).filter((p) => matches(p, q.value));
+  const top = list.getBoundingClientRect().top + window.scrollY + (pager.hidden ? PAGER_PX : 0);
+  const first = list.firstElementChild;      // 그려진 칸이 있으면 실제 높이(클릭 수 줄이 붙으면 커진다)
+  const itemH = first ? first.getBoundingClientRect().height + 10 : ITEM_PX;
+  const per = pageSize(window.innerHeight, top, itemH);
+  const shown = pageOf(hits, page, per);
+  page = shown.page;
+  list.replaceChildren(...shown.items.map(item));
+  drawPager(shown.page, shown.pages);
+  empty.hidden = hits.length > 0;
+}
+// 누르면 시트에 +1(같은 브라우저 30분에 한 번) — 기다리지 않고 바로 상품으로 넘어간다(keepalive)
+function countClick(no) {
+  const url = counterUrl(COUNTER_URL, "hit", no);
+  if (!url) return;
+  const key = `usesawthis_coupang_click_${no}`;
+  let last;
+  try { last = localStorage.getItem(key); } catch (e) { last = null; }
+  if (!shouldCount(last === null ? undefined : last, Date.now())) return;
+  try { localStorage.setItem(key, String(Date.now())); } catch (e) { /* 저장 불가 */ }
+  fetch(url, { mode: "no-cors", keepalive: true }).catch(() => {});
+}
+function loadCounts() {
+  const url = counterUrl(COUNTER_URL, "all");
+  if (!url) return;
+  fetch(url).then((r) => r.json()).then((d) => { COUNTS = (d && d.counts) || {}; render(); }).catch(() => {});
+}
+q.addEventListener("input", () => { page = 1; render(); });
+window.addEventListener("resize", () => render());
+q.value = new URLSearchParams(location.search).get("n") || "";
+fetch("products.json", { cache: "no-store" })
+  .then((r) => r.json())
+  .then((d) => { PRODUCTS = Array.isArray(d.products) ? d.products : []; render(); loadCounts(); })
+  .catch(() => { empty.textContent = "목록을 불러오지 못했어요. 잠시 뒤 새로고침해 주세요."; empty.hidden = false; });
+</script>
+</body>
+</html>
