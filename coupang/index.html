@@ -20,6 +20,10 @@
   .cp-search { margin: 8px 0; padding: 10px 12px; border: 2px solid var(--mint); border-radius: 12px; background: var(--card); }
   .cp-search p { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
   .cp-search iframe { display: block; width: 100%; border: 0; }
+  .promos { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 0 0 14px; }
+  .promos[hidden] { display: none; }
+  .promos a { display: block; flex: 1 1 240px; max-width: 320px; text-decoration: none; color: var(--muted); font-size: 12px; text-align: center; }
+  .promos img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); }
   .search { position: sticky; top: 0; padding: 8px 0; background: var(--bg); }
   .search input { width: 100%; font-size: 18px; padding: 12px 14px; border: 2px solid var(--mint); border-radius: 12px; background: var(--card); color: var(--ink); outline: none; }
   ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -47,6 +51,7 @@
     <p>글에 나온 상품 번호를 검색하세요</p>
   </header>
   <div class="ad">이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</div>
+  <section id="promos" class="promos" aria-label="쿠팡 프로모션" hidden></section>
   <section class="cp-search"><p>🔍 여기서 쿠팡 제품을 검색해 보세요</p><iframe src="https://coupa.ng/cqsi6L" width="100%" height="75" frameborder="0" scrolling="no" referrerpolicy="unsafe-url"></iframe></section>
   <div class="search">
     <input id="q" type="search" inputmode="search" placeholder="상품 번호(예: 1) 또는 이름" autocomplete="off">
@@ -58,7 +63,7 @@
 <script type="module">
 // 상품 목록은 products.json(새 상품이 맨 위) — 글을 예약할 때 앱이 한 줄씩 추가한다.
 // open_at(UTC)이 있으면 그 시각부터 보인다(글 예약 시각과 같게). 한 쪽에 50개씩 나눈다(2026-11-06).
-import { visibleProducts, matches, pageOf, pageButtons, clickLabel, shouldCount, counterUrl } from "./list.js";
+import { visibleProducts, activePromos, matches, pageOf, pageButtons, clickLabel, shouldCount, counterUrl } from "./list.js";
 import { COUNTER_URL } from "./counter.js";
 
 const PER_PAGE = 50;
@@ -74,7 +79,7 @@ const pad = (n) => String(n).padStart(4, "0");
 
 // 주소는 https?:// 만(그 밖의 javascript: 등은 막는다), 사진은 우리 img/ 경로도 허용
 const safeHttp = (u) => (/^https?:\/\//i.test(String(u || "")) ? String(u) : "#");
-const safeImg = (u) => (/^(https?:\/\/|img\/)/i.test(String(u || "")) ? String(u) : "");
+const safeImg = (u) => (/^(https?:\/\/|img\/|promo-[\w-]+\.(jpg|png)$)/i.test(String(u || "")) ? String(u) : "");
 
 function item(p) {
   const li = document.createElement("li");
@@ -95,6 +100,23 @@ function item(p) {
   a.append(img, name, go);
   li.append(a);
   return li;
+}
+
+// 프로모션 배너 — 행사 마지막 날(until, 한국 날짜)까지만. 끝난 배너는 promos.json에 남아 있어도 안 보인다.
+function drawPromos(promos) {
+  const box = document.getElementById("promos");
+  const live = activePromos(promos, Date.now());
+  box.replaceChildren(...live.map((p) => {
+    const a = document.createElement("a");
+    a.href = safeHttp(p.url);
+    a.rel = "nofollow sponsored noopener";
+    const img = document.createElement("img"); img.src = safeImg(p.img); img.alt = p.title || "쿠팡 프로모션";
+    img.width = 640; img.height = 640;
+    const [, m, d] = p.until.split("-").map(Number);
+    a.append(img, `${p.title || "쿠팡 프로모션"} · ~${m}/${d}까지`);
+    return a;
+  }));
+  box.hidden = live.length === 0;
 }
 
 function button(text, to, label, current) {
@@ -142,6 +164,8 @@ function loadCounts() {
 }
 q.addEventListener("input", () => { page = 1; render(); });
 q.value = new URLSearchParams(location.search).get("n") || "";
+fetch("promos.json", { cache: "no-store" })
+  .then((r) => r.json()).then((d) => drawPromos(d && d.promos)).catch(() => {});
 fetch("products.json", { cache: "no-store" })
   .then((r) => r.json())
   .then((d) => { PRODUCTS = Array.isArray(d.products) ? d.products : []; render(); loadCounts(); })

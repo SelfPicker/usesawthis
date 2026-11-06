@@ -58,3 +58,12 @@ export function counterUrl(base, act, no) {
   if (!base) return "";
   return `${base}?act=${act}${no !== undefined ? `&no=${encodeURIComponent(no)}` : ""}`;
 }
+
+// ── 프로모션 배너(2026-11-06) — promos.json {"promos": [{id, title, img, url, until}]} ──
+// until = 행사 마지막 날(한국 날짜 YYYY-MM-DD). 그날 23:59:59(KST)까지만 보인다. 날짜가 없거나 못 읽으면 안 건다.
+export function activePromos(promos, nowMs) {
+  return (Array.isArray(promos) ? promos : []).filter((p) => {
+    const end = /^\d{4}-\d{2}-\d{2}$/.test((p && p.until) || "") ? Date.parse(`${p.until}T23:59:59.999+09:00`) : NaN;
+    return Number.isFinite(end) && nowMs <= end;
+  });
+}
