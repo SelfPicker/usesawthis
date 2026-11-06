@@ -20,10 +20,15 @@
   .cp-search { margin: 8px 0; padding: 10px 12px; border: 2px solid var(--mint); border-radius: 12px; background: var(--card); }
   .cp-search p { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
   .cp-search iframe { display: block; width: 100%; border: 0; }
-  .promos { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 0 0 14px; }
+  .promos { display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px; }
   .promos[hidden] { display: none; }
-  .promos a { display: block; flex: 1 1 240px; max-width: 320px; text-decoration: none; color: var(--muted); font-size: 12px; text-align: center; }
-  .promos img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); }
+  .promos a { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; padding: 12px 14px; border-radius: 14px;
+    background: linear-gradient(135deg, #ff5a3c, #ff2f6d); box-shadow: 0 4px 14px rgba(255, 60, 90, .25); }
+  .promos a:active { transform: scale(.99); }
+  .promo-text { flex: 1; min-width: 0; word-break: keep-all; }
+  .promo-hook { display: block; font-size: 18px; font-weight: 800; line-height: 1.3; }
+  .promo-sub { display: block; font-size: 13px; opacity: .92; margin-top: 2px; }
+  .promo-go { flex: none; font-weight: 800; font-size: 14px; background: #fff; color: #ff2f6d; border-radius: 999px; padding: 6px 12px; }
   .search { position: sticky; top: 0; padding: 8px 0; background: var(--bg); }
   .search input { width: 100%; font-size: 18px; padding: 12px 14px; border: 2px solid var(--mint); border-radius: 12px; background: var(--card); color: var(--ink); outline: none; }
   ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -79,7 +84,7 @@ const pad = (n) => String(n).padStart(4, "0");
 
 // 주소는 https?:// 만(그 밖의 javascript: 등은 막는다), 사진은 우리 img/ 경로도 허용
 const safeHttp = (u) => (/^https?:\/\//i.test(String(u || "")) ? String(u) : "#");
-const safeImg = (u) => (/^(https?:\/\/|img\/|promo-[\w-]+\.(jpg|png)$)/i.test(String(u || "")) ? String(u) : "");
+const safeImg = (u) => (/^(https?:\/\/|img\/)/i.test(String(u || "")) ? String(u) : "");
 
 function item(p) {
   const li = document.createElement("li");
@@ -110,10 +115,13 @@ function drawPromos(promos) {
     const a = document.createElement("a");
     a.href = safeHttp(p.url);
     a.rel = "nofollow sponsored noopener";
-    const img = document.createElement("img"); img.src = safeImg(p.img); img.alt = p.title || "쿠팡 프로모션";
-    img.width = 640; img.height = 640;
     const [, m, d] = p.until.split("-").map(Number);
-    a.append(img, `${p.title || "쿠팡 프로모션"} · ~${m}/${d}까지`);
+    const text = document.createElement("span"); text.className = "promo-text";
+    const hook = document.createElement("span"); hook.className = "promo-hook"; hook.textContent = p.hook || p.title || "쿠팡 특가 진행 중";
+    const sub = document.createElement("span"); sub.className = "promo-sub"; sub.textContent = `${p.sub ? p.sub + " · " : ""}~${m}/${d}까지`;
+    const go = document.createElement("span"); go.className = "promo-go"; go.textContent = "보러 가기";
+    text.append(hook, sub);
+    a.append(text, go);
     return a;
   }));
   box.hidden = live.length === 0;
