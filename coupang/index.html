@@ -91,6 +91,7 @@ function item(p) {
   const a = document.createElement("a");
   a.href = safeHttp(p.url);
   a.rel = "nofollow sponsored noopener";
+  a.target = "_blank";
   const img = document.createElement("img"); img.className = "thumb"; img.src = safeImg(p.img); img.alt = p.name; img.loading = "lazy";
   img.width = 72; img.height = 72;
   const name = document.createElement("span"); name.className = "name"; name.textContent = p.name;
@@ -115,6 +116,7 @@ function drawPromos(promos) {
     const a = document.createElement("a");
     a.href = safeHttp(p.url);
     a.rel = "nofollow sponsored noopener";
+    a.target = "_blank";
     const [, m, d] = p.until.split("-").map(Number);
     const text = document.createElement("span"); text.className = "promo-text";
     const hook = document.createElement("span"); hook.className = "promo-hook"; hook.textContent = p.hook || p.title || "쿠팡 특가 진행 중";
