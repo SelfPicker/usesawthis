@@ -1,6 +1,15 @@
 {
  "products": [
   {
+   "no": 69,
+   "product_id": "5643894249",
+   "name": "룸모 파파르델레 프리미엄 파스타",
+   "price": 5980,
+   "url": "https://link.coupang.com/a/iuY7FQlaSW",
+   "img": "img/69.jpg",
+   "open_at": "2026-11-15T04:00:00Z"
+  },
+  {
    "no": 68,
    "product_id": "8290328968",
    "name": "부샤드 벨기에 카라멜&씨솔트 밀크초콜릿, 132g, 3개",
